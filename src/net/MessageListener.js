@@ -1,4 +1,4 @@
-import { system, ScriptEventSource } from '@minecraft/server';
+import { system, ScriptEventSource, ScriptEventCommandMessageAfterEvent } from '@minecraft/server';
 import { MIPS, Endpoint, Header } from '../proto/index.js';
 import { NetworkSerializer } from './NetworkSerializer.js';
 import { EndpointManager } from './EndpointManager.js';
@@ -44,7 +44,7 @@ export class MessageListener {
     /**
      * Handles incoming script events
      * @private
-     * @param {*} event - Script event
+     * @param {ScriptEventCommandMessageAfterEvent} event - Script event
      * @returns {Generator<void, void>} Generator for async execution
      */
     *#handleScriptEvent(event) {
