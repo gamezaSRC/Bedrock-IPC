@@ -1,5 +1,5 @@
 import { system } from '@minecraft/server';
-import { Buffer, MIPS, Endpoint, Header } from '../proto/index.js';
+import { Buffer, MIPS, Endpoint, Header, Encoding } from '../proto/index.js';
 import { NetworkSerializer } from './NetworkSerializer.js';
 
 /**
@@ -45,7 +45,7 @@ export class MessageEmitter {
             const serialized_packet = serialized_packets[i];
             const header = {
                 guid,
-                encoding: 'mcbe-ipc:v3',
+                encoding: Encoding.MCBE_IPC_V3,
                 index: i,
                 final: i === serialized_packets.length - 1
             };

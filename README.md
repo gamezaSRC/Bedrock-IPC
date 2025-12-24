@@ -34,7 +34,7 @@ This IPC (Inter-Process Communication) this system follows SOLID principles.
 
 ## Usage
 
-### Basic Usage (Backward Compatible)
+### Basic Usage
 
 ```javascript
 import IPC, { PROTO } from './IPC.js';
@@ -51,7 +51,7 @@ IPC.on('myChannel', PROTO.String, (message) => {
 const result = await IPC.invoke('calculate', PROTO.Int32, 42, PROTO.Int32);
 ```
 
-### Advanced Usage (New Architecture)
+### Advanced Usage
 
 ```javascript
 import { IPCClient } from './IPC/client/IPCClient.js';

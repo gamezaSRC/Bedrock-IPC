@@ -12,6 +12,13 @@ export const Header = Serializers.Object({
 });
 
 /**
+ * Encoding types for IPC messages
+ */
+export const Encoding = {
+    MCBE_IPC_V3: 'mcbe-ipc:v3'
+};
+
+/**
  * Endpoint identifier type
  */
 export const Endpoint = Serializers.String;
