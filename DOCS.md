@@ -45,17 +45,10 @@ import IPC, { PROTO } from './IPC.js';
 Run the test suite to ensure everything works:
 
 ```javascript
-import { runAllTests } from './Utilities/IPC/tests/IPCTests.js';
+import { runAllTests } from './tests/index.js';
 
-world.afterEvents.worldLoad.subscribe(() => {
-    runAllTests();
-});
-```
-
-### 3. Alternative: Using NET (Low-level API)
-
-```javascript
-import NET from './NET.js';
+// Run all tests
+await runAllTests();
 ```
 
 ---
@@ -88,8 +81,7 @@ IPC.handle(
     PROTO.Object({       // responds: player object
         name: PROTO.String,
         level: PROTO.Int32
-    }),
-    (playerId) => {
+    }), (playerId) => {
         return {
             name: 'Steve',
             level: 10
@@ -186,8 +178,6 @@ const unsubscribe = IPC.on('chat', PROTO.String, (message) => {
     console.log('Message:', message);
 });
 
-// Stop listening
-unsubscribe();
 ```
 
 **Parameters:**
@@ -321,17 +311,23 @@ console.log('Max fragment size:', NET.FRAG_MAX);
 ### Primitive Types
 
 ```javascript
+PROTO.Void          // No data
+PROTO.Null          // Always null
+PROTO.Undefined     // Always undefined
+PROTO.Boolean       // true or false
 PROTO.Int8          // -128 to 127
 PROTO.Int16         // -32768 to 32767
 PROTO.Int32         // -2147483648 to 2147483647
 PROTO.UInt8         // 0 to 255
 PROTO.UInt16        // 0 to 65535
 PROTO.UInt32        // 0 to 4294967295
-PROTO.VarInt32      // Variable-length signed integer
+PROTO.VarInt        // Variable-length signed integer
+PROTO.VarUInt       // Variable-length unsigned integer
 PROTO.Float32       // Single precision (4 bytes)
 PROTO.Float64       // Double precision (8 bytes)
-PROTO.Boolean       // true or false
-PROTO.String        // Text (variable length)
+PROTO.String        // UTF-16 encoded text
+PROTO.Bytes         // Binary data (Uint8Array)
+PROTO.Date          // Timestamp (milliseconds since epoch)
 ```
 
 ### Collection Types
@@ -350,7 +346,7 @@ PROTO.Object({
 // Tuple (fixed-length, heterogeneous)
 PROTO.Tuple(PROTO.String, PROTO.Int32, PROTO.Boolean)
 
-// Optional value (can be undefined)
+// Optional value (can be null)
 PROTO.Optional(PROTO.String)
 
 // Map with string keys and int values
@@ -372,22 +368,55 @@ PROTO.Date        // JavaScript Date object
 ### Creating Custom Serializers
 
 ```javascript
-const MyCustomType = {
-    *serialize(value, stream) {
-        // Encode value to stream
-        yield* PROTO.String.serialize(value.name, stream);
-        yield* PROTO.Int32.serialize(value.count, stream);
-    },
-    *deserialize(stream) {
-        // Decode value from stream
-        const name = yield* PROTO.String.deserialize(stream);
-        const count = yield* PROTO.Int32.deserialize(stream);
+import { Serializer } from './proto/Serializer.js';
+
+class MyCustomType extends Serializer {
+    *serialize(value, buffer) {
+        // Encode value to buffer
+        yield* PROTO.String.serialize(value.name, buffer);
+        yield* PROTO.Int32.serialize(value.count, buffer);
+    }
+
+    *deserialize(buffer) {
+        // Decode value from buffer
+        const name = yield* PROTO.String.deserialize(buffer);
+        const count = yield* PROTO.Int32.deserialize(buffer);
         return { name, count };
     }
-};
+}
+
+const MyCustom = new MyCustomType();
 
 // Use it like any other serializer
-IPC.send('custom', MyCustomType, { name: 'test', count: 5 });
+IPC.send('custom', MyCustom, { name: 'test', count: 5 });
+```
+
+### P2P Encrypted Connections
+
+```javascript
+import { DirectIPCClient } from './direct/index.js';
+
+// Create P2P client
+const client = new DirectIPCClient('peer_id');
+
+// Connect to another peer
+const conn = await client.connect('other_peer_id', {
+    encrypted: true,
+    timeout: 100,
+    prime: 19893121,      // Custom Diffie-Hellman prime
+    generator: 341        // Custom generator
+});
+
+// Send encrypted message
+conn.send('secure:message', PROTO.String, 'Secret data');
+
+// Listen for encrypted messages
+conn.on('secure:message', PROTO.String, function* (message) {
+    console.log('Received:', message);
+});
+
+// Disconnect
+client.disconnect('other_peer_id');
 ```
 
 ---
@@ -600,37 +629,54 @@ console.log('Sum:', sum); // 15
 ### Run All Tests
 
 ```javascript
-import { runAllTests } from './Utilities/IPC/tests/IPCTests.js';
+import { runAllTests } from './tests/index.js';
 
-world.afterEvents.worldLoad.subscribe(() => {
-    runAllTests();
-});
+// Run all tests
+await runAllTests();
 ```
 
-### Run Individual Tests
+### Run Individual Test Suites
 
 ```javascript
 import { 
-    testSendOn, 
-    testInvokeHandle, 
-    testObjectCommunication 
-} from './Utilities/IPC/tests/IPCTests.js';
+    runAllProtoTests,
+    runAllNETTests,
+    runAllIPCTests,
+    runAllDirectIPCTests
+} from './tests/index.js';
 
-await testSendOn();
-await testInvokeHandle();
-await testObjectCommunication();
+runAllProtoTests();           // Protocol layer tests
+await runAllNETTests();       // Network layer tests
+await runAllIPCTests();       // IPC layer tests
+await runAllDirectIPCTests(); // P2P layer tests
 ```
 
-### Available Tests
+### Available Test Suites
 
-1. **testSendOn** - Basic one-way messaging
-2. **testInvokeHandle** - Request-response pattern
-3. **testObjectCommunication** - Object serialization
-4. **testArrayCommunication** - Array operations
-5. **testMultipleListeners** - Broadcasting
-6. **testOnce** - Single message listening
-7. **testComplexObjects** - Nested structures
-8. **testPrimitives** - Primitive type handling
+**Protocol Layer (proto.test.js):**
+- Primitive serializers (Boolean, Int32, Float64, String, Bytes)
+- Collection serializers (Array, Object, Tuple, Optional, Map, Set)
+- ByteBuffer operations (write/read, floating point, string encoding, capacity growth)
+- Special serializers (Date)
+
+**Network Layer (net.test.js):**
+- Endpoint communication
+- Message fragmentation and reassembly
+- Complex schema transmission
+- Concurrent transmissions
+
+**IPC Layer (ipc.test.js):**
+- Send/On functionality
+- Invoke/Handle (request-response)
+- Complex object serialization
+- Multiple listeners on same channel
+
+**DirectIPC Layer (direct.test.js):**
+- Connection establishment
+- Custom Diffie-Hellman parameters
+- Connection options
+- Connection manager operations
+- Peer ID generation and uniqueness
 
 ---
 
@@ -674,18 +720,7 @@ try {
 }
 ```
 
-### 4. Unsubscribe When Done
-
-```javascript
-const unsubscribe = IPC.on('channel', PROTO.String, (msg) => {
-    // Handle message
-});
-
-// Later, clean up
-unsubscribe();
-```
-
-### 5. Use once() for One-Time Events
+### 4. Use once() for One-Time Events
 
 ```javascript
 // Good for startup events
@@ -694,7 +729,7 @@ IPC.once('server:ready', PROTO.Boolean, (ready) => {
 });
 ```
 
-### 6. Type Safety with Custom Types
+### 5. Type Safety with Custom Types
 
 ```javascript
 // Validate data before sending
@@ -728,23 +763,6 @@ IPC.send('channel', PROTO.Int32, 42);
 
 // Receive with Int32 (must match!)
 IPC.on('channel', PROTO.Int32, (value) => console.log(value));
-```
-
----
-
-### Issue: Memory Leaks from Listeners
-
-**Solution:** Always unsubscribe when done.
-
-```javascript
-// Bad - listener stays in memory
-IPC.on('channel', PROTO.String, (msg) => console.log(msg));
-
-// Good - clean up
-const unsubscribe = IPC.on('channel', PROTO.String, (msg) => {
-    console.log(msg);
-});
-unsubscribe(); // Remove listener
 ```
 
 ---
@@ -803,14 +821,5 @@ const CustomSchema = PROTO.Object({
 
 **A:** No, messages are delivered immediately. If no listener exists, the message is lost. Use `handle()` for guaranteed delivery via `invoke()`.
 
-### Q: Can I monitor IPC traffic for debugging?
-
-**A:** Yes, add logging in your handlers:
-
-```javascript
-IPC.on('debug:channel', PROTO.String, (msg) => {
-    console.log('[IPC Debug]', msg);
-});
-```
 
 ---
